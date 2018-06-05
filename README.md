@@ -141,7 +141,7 @@ The **withMean** argument specifies to center the data with the mean before scal
 
 
 # Analysis
-This section identifies different weather patterns for a weather station in San Diego, CA using k-means clustering. First, we determine the optimal number of clusters using elbow plot.  Then we plot cluster centers for the optimal number of clusters to identify distinct weather patterns corresponding to each cluster.
+This section identifies different weather patterns for a weather station in San Diego, CA using k-means clustering. First, we determine the optimal number of clusters using elbow plot.  Then we find cluster centers for the optimal number of clusters to identify distinct weather patterns corresponding to each cluster.
 
 The [previous section](https://eagronin.github.io/weather-clustering-spark-prepare/) explores, cleans and scales the data to prepare it for the clustering analysis.
 
@@ -224,7 +224,7 @@ def pd_centers(featuresUsed, centers):
 	return P
 ```
 
-Finally, the function below plots cluster centers:
+Finally, the function below plots the cluster centers:
 
 ```python
 def parallel_plot(data, P):
@@ -234,7 +234,7 @@ def parallel_plot(data, P):
 ```  
   
   
-The code in the remainder of this section calls the function above to create the elbow plot and fit k-means algorithm for the optimal number of clusters.  
+The code in the remainder of this section calls the functions above to create the elbow plot and fit k-means algorithm for the chosen number of clusters.  
 
 The following code calculates WSSE for each number of clusters ranging from 2 to 30:
 
@@ -306,21 +306,24 @@ Training for cluster size 30
 ......................WSSE = 57099.24 
 ```
 
-By calling `elbow_plot(wsseList, clusters)` we create the elboplot, which is presented in the [next section](https://eagronin.github.io/weather-clustering-spark-report/).
+By calling `elbow_plot(wsseList, clusters)` we create an elbowplot, which is presented in the [next section](https://eagronin.github.io/weather-clustering-spark-report/).
 
-As we will discuss in the [next section](https://eagronin.github.io/weather-clustering-spark-report/), we choose the number of clusters to be 12 based on the elbo plot.
+As we will discuss in the [next section](https://eagronin.github.io/weather-clustering-spark-report/), we choose the number of clusters to be 12 based on the elbow plot.
 
+Once we have chosen the number of clusters using a scaled down version of the dataset, we will go back to the `scaledData` dataset to fit the k-means algorithm for 12 clusters using that dataset.  We again choose the persist() method to keep the datasest in memory for faster processing:
 
+```python
 scaledDataFeat = scaledData.select('features')
 scaledDataFeat.persist()
-
 
 kmeans = KMeans(k = 12, seed = 1)
 model = kmeans.fit(scaledDataFeat)
 transformed = model.transform(scaledDataFeat)
 
-
 transformed.head(10)
+```
+
+The code above results in a dataset that contains in each row a point in the feature sapce as the first column and the cluster ID to which this point belongs as the second column:
 
 ```
 [Row(features=DenseVector([-1.4846, 0.2454, -0.6839, -0.7656, -0.6215, -0.7444, 0.4923]), prediction=2),
@@ -333,10 +336,17 @@ transformed.head(10)
  Row(features=DenseVector([-1.6156, 0.1998, -0.8413, -0.3768, -0.7189, -0.4137, 0.5572]), prediction=2),
  Row(features=DenseVector([-1.6156, -0.0132, -0.9987, 0.255, -1.0109, 0.0411, 0.9121]), prediction=2),
  Row(features=DenseVector([-1.6156, -0.0436, -0.9987, 0.4008, -0.9568, 0.3305, 0.9502]), prediction=2)]
+ ...
 ```
- 
+
+Once the model is created, we can determine the center measurement of each cluster:
+
+```python
 centers = model.clusterCenters()
 centers
+```
+
+These cluster centers are as follows:
 
 ```
 [array([-0.13720796,  0.6061152 ,  0.22970948, -0.62174454,  0.40604553, -0.63465994, -0.42215364]),
@@ -353,23 +363,62 @@ centers
  array([ 0.3051367 ,  0.67973831,  1.36434828, -0.63793718,  1.631528  , -0.58807924, -0.67531539])]
 ```
 
+It is difficult to compare the cluster centers by just looking at these numbers. So we will use plots in the next step to visualize them using parallel coordinates plots, which are used to visualize multi-dimensional data.  Each line plots the centroid of a cluster, and all of the features are plotted together. Because the feature values were scaled to have mean = 0 and standard deviation = 1, the values on the y-axis of these parallel coordinates plots show the number of standard deviations from the mean.
+
+The plots are created with matplotlib using a Pandas DataFrame.  Each row in the dataframe contains the cluster center coordinates and cluster label. We use the `pd_centers()` function described above to create the Pandas DataFrame:
+ 
+```python
 P = pd_centers(featuresUsed, centers)
+```
+
+Next step: [Results](https://eagronin.github.io/weather-clustering-spark-report/)
 
 
+# Results
+This section visualizes and discusses the results of the k-means clustering analysis identifying different weather patterns for a weather station in San Diego, CA. The elbowplot discussed in the previous section is shown first.  Then we plot and discuss several charts showing cluster centers for the optimal number of clusters to identify distinct weather patterns.
+
+The analysis is discussed in the [previous section](https://eagronin.github.io/weather-clustering-spark-analyze/).
+
+Let's first plot the elbowplot by calling elbow_plot() function described in the [previous section](https://eagronin.github.io/weather-clustering-spark-analyze/).
+
+![](elbow plot)
+
+The values for the number of clusters (k) are plotted against WSSE values, and the elbow, or bend in the curve, provides an estimate for the optimal value for k.  In this plot, we see that the elbow in the curve is between 10 and 15, so let's choose k = 12. The subsequent plots of cluster centers are all based on the number of clusters k = 12.
+
+Let's show clusters for "Dry Days", i.e., weather samples with low relative humidity:
+
+```python
 parallel_plot(P[P['relative_humidity'] < -0.5], P)
+```
 
+![](chart 1)
+
+The first argument to parallel_plot selects the clusters whosse relative humidities are cetered less than 0.5 from the mean alue. All clusters in this plot have relative_humidity < -0.5, but they differ in values for other features, meaning that there are several weather patterns that include low humidity.
+
+Note in particular cluster 4. This cluster has samples with lower-than-average wind direction values (wind direction values are in degrees, and 0 means wind coming from the North and increasing clockwise). So samples in this cluster have wind coming from the N and NE directions, with very high wind speeds, and low relative humidity. These are characteristic weather patterns for Santa Ana conditions, which greatly increase the dangers of wildfires.
+
+Let's show clusters for "Warm Days", i.e., weather samples with high air temperature:
 
 parallel_plot(P[P['air_temp'] > 0.5], P)
 
+![](chart 2)
+
+All clusters in this plot have ​air_temp > 0.5, but they differ in values for other features.  
+
+Let's show clusters for "Cool Days", i.e., weather samples with high relative humidity and low air temperature:
 
 parallel_plot(P[(P['relative_humidity'] > 0.5) & (P['air_temp'] < 0.5)], P)
 
+![](chart 3)
+
+All clusters in this plot have relative_humidity > 0.5 and air_temp < 0.5. These clusters represent cool temperature with high humidity and possibly rainy weather patterns. For cluster 5, note that the wind speed values are high, suggesting stormy weather patterns with rain and wind.
+
+So far, we've seen all the clusters except 2 since it did not fall into any of the other categories. Let's plot this cluster:
 
 parallel_plot(P.iloc[[2]], P)
 
+![](chart 4)
 
-Results
+Cluster 2 captures days with mild weather.
 
-Intro
-
-Charts and interpretation
+Previous step: [Analysis](https://eagronin.github.io/weather-clustering-spark-analyze/)
