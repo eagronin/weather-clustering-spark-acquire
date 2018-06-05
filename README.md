@@ -166,10 +166,10 @@ def parallel_plot(data, P):
   
 clusters = range(2, 31)
 wsseList = elbow(elbowset, clusters)
-Training for cluster size 2 
-......................WSSE = 114993.13181214454 
-Training for cluster size 3 
-......................WSSE = 104181.0978581738 
+ Training for cluster size 2 
+ ......................WSSE = 114993.13181214454 
+ Training for cluster size 3 
+ ......................WSSE = 104181.0978581738 
 Training for cluster size 4 
 ......................WSSE = 94577.27151288436 
 Training for cluster size 5 
@@ -239,7 +239,7 @@ transformed = model.transform(scaledDataFeat)
 
 
 transformed.head(10)
-[Row(features=DenseVector([-1.4846, 0.2454, -0.6839, -0.7656, -0.6215, -0.7444, 0.4923]), prediction=2),
+ [Row(features=DenseVector([-1.4846, 0.2454, -0.6839, -0.7656, -0.6215, -0.7444, 0.4923]), prediction=2),
  Row(features=DenseVector([-1.4846, 0.0325, -0.1906, -0.7656, 0.0383, -0.6617, -0.3471]), prediction=0),
  Row(features=DenseVector([-1.5173, 0.1237, -0.6524, -0.3768, -0.4485, -0.3723, 0.4084]), prediction=2),
  Row(features=DenseVector([-1.5173, 0.0629, -0.7468, -0.3768, -0.654, -0.4137, 0.3931]), prediction=2),
