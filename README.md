@@ -66,6 +66,8 @@ before - after
 
 
 workingDF.columns
+
+```
 ['rowID',
  'air_pressure',
  'air_temp',
@@ -76,7 +78,7 @@ workingDF.columns
  'min_wind_direction',
  'min_wind_speed',
  'relative_humidity']
- 
+```
  
  featuresUsed = ['air_pressure',
  'air_temp',
