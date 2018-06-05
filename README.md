@@ -1,9 +1,17 @@
 # Data Acquisition
+This section describes and imports the dataset **minute-weather.csv**, which is subsequently used in cluster analysis using k-means to identify different weather patterns for a weather station in San Diego, CA.
 
-Intro
+The [next section explores](https://eagronin.github.io/weather-clustering-spark-prepare/), cleans and scales the data to prepare it for clustering analysis in the subsequent section.
 
-Description of dataset
+The file **minute-weather.csv** was downloaded from the Coursera website and saved on the Cloudera cloud.
 
+This is a comma-separated file that contains weather data. The data comes from a weather station located in San Diego, CA. The weather station is equipped with sensors that capture weather-related measurements such as air temperature, air pressure, and relative humidity. Data was collected for a period of three years, from September 2011 to September 2014, to ensure that sufficient data for different seasons and weather conditions is captured.  Sensor measurements from the weather station were captured at one-minute intervals.
+
+Each row in **minute-weather.csv** captures weather data for a separate minute. This is the same dataset that was used to construct **daily_weather.csv** described [here](https://eagronin.github.io/weather-classification-spark-acquire/).
+
+The following code imports **daily_weather.csv** from a folder on the cloud:
+
+```python
 from pyspark.sql import SQLContext
 from pyspark.ml.clustering import KMeans
 from pyspark.ml.feature import VectorAssembler
@@ -16,20 +24,29 @@ sqlContext = SQLContext(sc)
 df = sqlContext.read.load('file:///home/cloudera/Downloads/big-data-4/minute_weather.csv', 
                           format='com.databricks.spark.csv', 
                           header='true',inferSchema='true')
-                          
+```                          
 
 # Data Preparation
+This section explores, cleans and scales the data to prepare it for cluster analysis, which identifies different weather patterns for a weather station in San Diego, CA using k-means. 
 
-df.count()
-1587257
+The dataset is described and imported in the [previous section](https://eagronin.github.io/weather-clustering-spark-acquire/).
 
+The analysis is described in the [next section](https://eagronin.github.io/weather-clustering-spark-analyze/).
 
+The imported dataset includes over 1.5 million rows, as can be verified using `df.count()`.  For the purpose of this analysis a smaller dataset was used that contains only one-tenth of the data.  The following code creates such a subset of data:
+
+```python
 filteredDF = df.filter((df.rowID % 10) == 0)
 filteredDF.count()
-158726
+```
 
+The number of rows in the subset is 158,726.
 
+Below are the summary statistics: 
+
+```python
 filteredDF.describe().toPandas().transpose()
+```
 
 ```
 summary			count	mean		stddev		min	max
@@ -47,25 +64,48 @@ rain_duration		158725	0.40		8.66		0.0	2960.0
 relative_humidity	158726	47.60		26.21		0.9	93.0
 ```
 
+The weather measurements in this dataset were collected during a drought in San Diego. We can
+count the how many values of rain accumulation and duration are 0:
+
+```python
 filteredDF.filter(filteredDF.rain_accumulation == 0.0).count()
+```
+
+```
 157812
+```
 
-
+```python
 filteredDF.filter(filteredDF.rain_duration == 0.0).count()
+```
+
+```
 157237
+```
 
+Since most the values for these columns are 0, let's drop them from the DataFrame to speed up the analyses. We also drop the hpwren_timestamp column since it is not used in the analysis.
 
+```python
 workingDF = filteredDF.drop('rain_accumulation').drop('rain_duration').drop('hpwren_timestamp')
+```
 
+Let's drop rows with missing values and count how many rows were dropped:
 
+```python
 before = workingDF.count()
 workingDF = workingDF.na.drop()
 after = workingDF.count()
 before - after
+```
+
+```
 46
+```
 
+Since the features are on different scales (e.g., air pressure values are in the 900's, while relative humidities range from 0 to 100), they need to be scaled. We will scale them so that each feature will have a value of 0 for the mean, and a value of 1 for the standard deviation.
 
-workingDF.columns
+First, we will combine the columns into a single vector column. Let's look at the columns in the
+DataFrame, using the command `workingDF.columns`:
 
 ```
 ['rowID',
@@ -79,7 +119,10 @@ workingDF.columns
  'min_wind_speed',
  'relative_humidity']
 ```
- 
+
+We do not want to include rowID since it is the row number. The minimum wind measurements have a high correlation to the average wind measurements, so we will not include them either. Let's create an array of the columns we want to combine, and use VectorAssembler to create the vector column:
+
+```python
  featuresUsed = ['air_pressure',
  'air_temp',
  'avg_wind_direction',
@@ -87,21 +130,28 @@ workingDF.columns
  'max_wind_direction',
  'max_wind_speed',
  'relative_humidity']
+ 
 assembler = VectorAssembler(inputCols = featuresUsed, outputCol = 'features_unscaled')
 assembled = assembler.transform(workingDF)
+```
 
+Next, let's use ​StandardScaler to scale the data:
 
+```
 scaler = StandardScaler(inputCol = 'features_unscaled', outputCol = 'features', withStd = True, withMean = True)
 scalerModel = scaler.fit(assembled)
 scaledData = scalerModel.transform(assembled)
+```
+
+The **withMean** argument specifies to center the data with the mean before scaling, and with Std specifies to scale the data to the unit standard deviation.
 
 
+# Analysis
 scaledData = scaledData.select('features', 'rowID')
 elbowset = scaledData.filter((scaledData.rowID % 3) == 0).select('features')
 elbowset.persist()
 
 
-# Analysis
 
 
 Utility functions for Spark Cluster Analysis
