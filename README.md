@@ -170,10 +170,12 @@ def parallel_plot(data, P):
   
 clusters = range(2, 31)
 wsseList = elbow(elbowset, clusters)
- Training for cluster size 2 
- ......................WSSE = 114993.13181214454 
- Training for cluster size 3 
- ......................WSSE = 104181.0978581738 
+
+```
+Training for cluster size 2 
+......................WSSE = 114993.13181214454 
+Training for cluster size 3 
+......................WSSE = 104181.0978581738 
 Training for cluster size 4 
 ......................WSSE = 94577.27151288436 
 Training for cluster size 5 
@@ -228,7 +230,7 @@ Training for cluster size 29
 ......................WSSE = 57426.52665309544 
 Training for cluster size 30 
 ......................WSSE = 57099.24349435484 
-
+```
 
 elbow_plot(wsseList, clusters)
 
