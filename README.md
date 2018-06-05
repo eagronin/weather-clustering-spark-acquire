@@ -141,15 +141,16 @@ The **withMean** argument specifies to center the data with the mean before scal
 
 
 # Analysis
-scaledData = scaledData.select('features', 'rowID')
-elbowset = scaledData.filter((scaledData.rowID % 3) == 0).select('features')
-elbowset.persist()
+This section identifies different weather patterns for a weather station in San Diego, CA using k-means clustering. First, we determine the optimal number of clusters using elbow plot.  Then we plot cluster centers for the optimal number of clusters to identify distinct weather patterns corresponding to each cluster.
 
+The [previous section](https://eagronin.github.io/weather-clustering-spark-prepare/) explores, cleans and scales the data to prepare it for the clustering analysis.
 
+The [next section](https://eagronin.github.io/weather-clustering-spark-report/) reports and interprets the results.
 
+# Create Elbow Plot
+The k-means algorithm requires that the value of k, the number of clusters, to be specified. To determine a good value for k, we will use the “elbow” method. This method involves applying k-means, using different values for k, and calculating the within-cluster sum-of-squared error (WSSE). Since this means applying k-means multiple times, this process can be very compute-intensive. To speed up the process, we will use only a subset of the dataset. We will take every third sample from the dataset to create this subset:
 
-Utility functions for Spark Cluster Analysis
-
+```python
 from itertools import cycle, islice
 from math import sqrt
 from numpy import array
@@ -160,6 +161,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+scaledData = scaledData.select('features', 'rowID')
+elbowset = scaledData.filter((scaledData.rowID % 3) == 0).select('features')
+elbowset.persist()
+```
+
+The persist() method in the last row is used to keep the resulting dataset in memory for faster processing.  WSSE is calculated using the following function: 
+
+```python
 def computeCost(featuresAndPrediction, model):
     allClusterCenters = [DenseVector(c) for c in model.clusterCenters()]
     arrayCollection   = featuresAndPrediction.rdd.map(array)
@@ -170,8 +179,11 @@ def computeCost(featuresAndPrediction, model):
         return sqrt((z*z).sum())
     
     return arrayCollection.map(lambda row: error(row[0], row[1])).reduce(lambda x, y: x + y)
+```
 
+The function below iterates over the number of clusters to determine WSSE for each number of clusters to create the elbow plot:
 
+```python
 def elbow(elbowset, clusters):
 	wsseList = []	
 	for k in clusters:
@@ -186,11 +198,19 @@ def elbow(elbowset, clusters):
 
 		wsseList.append(W)
 	return wsseList
+```
 
+The function below plots WSSE against the number of clusters:
+
+```python
 def elbow_plot(wsseList, clusters):
 	wsseDF = pd.DataFrame({'WSSE' : wsseList, 'k' : clusters })
 	wsseDF.plot(y='WSSE', x='k', figsize=(15,10), grid=True, marker='o')
+```
 
+The following function converts cluster centers determined by the the k-means algorithm to a pandas dataframe in order to be able to plot cluster centers in matplotlib (Spark dataframes cannot be plotted using matplotlib): 
+
+```python
 def pd_centers(featuresUsed, centers):
 	colNames = list(featuresUsed)
 	colNames.append('prediction')
@@ -202,18 +222,28 @@ def pd_centers(featuresUsed, centers):
 	P = pd.DataFrame(Z, columns=colNames)
 	P['prediction'] = P['prediction'].astype(int)
 	return P
+```
 
+Finally, the function below plots cluster centers:
+
+```python
 def parallel_plot(data, P):
 	my_colors = list(islice(cycle(['b', 'r', 'g', 'y', 'k']), None, len(P)))
 	plt.figure(figsize=(15,8)).gca().axes.set_ylim([-3,+3])
 	parallel_coordinates(data, 'prediction', color = my_colors, marker='o')
+```  
   
   
-  
-  
-  
+The code in the remainder of this section calls the function above to create the elbow plot and fit k-means algorithm for the optimal number of clusters.  
+
+The following code calculates WSSE for each number of clusters ranging from 2 to 30:
+
+```
 clusters = range(2, 31)
 wsseList = elbow(elbowset, clusters)
+```
+
+This code generates the following output:
 
 ```
 Training for cluster size 2 
@@ -276,7 +306,9 @@ Training for cluster size 30
 ......................WSSE = 57099.24 
 ```
 
-elbow_plot(wsseList, clusters)
+By calling `elbow_plot(wsseList, clusters)` we create the elboplot, which is presented in the [next section](https://eagronin.github.io/weather-clustering-spark-report/).
+
+As we will discuss in the [next section](https://eagronin.github.io/weather-clustering-spark-report/), we choose the number of clusters to be 12 based on the elbo plot.
 
 
 scaledDataFeat = scaledData.select('features')
