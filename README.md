@@ -1,7 +1,7 @@
 # Data Acquisition
 This section describes and imports the dataset **minute-weather.csv**, which is subsequently used in cluster analysis using k-means to identify different weather patterns for a weather station in San Diego, CA.
 
-The [next section explores](https://eagronin.github.io/weather-clustering-spark-prepare/), cleans and scales the data to prepare it for clustering analysis in the subsequent section.
+The [next section](https://eagronin.github.io/weather-clustering-spark-prepare/) explores, cleans and scales the data to prepare it for clustering analysis in the subsequent section.
 
 The file **minute-weather.csv** was downloaded from the Coursera website and saved on the Cloudera cloud.
 
