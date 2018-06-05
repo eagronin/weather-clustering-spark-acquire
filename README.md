@@ -69,17 +69,13 @@ count the how many values of rain accumulation and duration are 0:
 
 ```python
 filteredDF.filter(filteredDF.rain_accumulation == 0.0).count()
-```
 
-```
 157812
 ```
 
 ```python
 filteredDF.filter(filteredDF.rain_duration == 0.0).count()
-```
 
-```
 157237
 ```
 
@@ -96,9 +92,7 @@ before = workingDF.count()
 workingDF = workingDF.na.drop()
 after = workingDF.count()
 before - after
-```
 
-```
 46
 ```
 
@@ -135,7 +129,7 @@ assembler = VectorAssembler(inputCols = featuresUsed, outputCol = 'features_unsc
 assembled = assembler.transform(workingDF)
 ```
 
-Next, let's use ​StandardScaler to scale the data:
+Next, let's use StandardScaler to scale the data:
 
 ```
 scaler = StandardScaler(inputCol = 'features_unscaled', outputCol = 'features', withStd = True, withMean = True)
