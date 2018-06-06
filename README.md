@@ -1,13 +1,11 @@
 # Data Acquisition
-This section describes and imports the dataset **minute-weather.csv**, which is subsequently used in cluster analysis using k-means to identify different weather patterns for a weather station in San Diego, CA.
+This section imports and describes the dataset **minute-weather.csv**, which is subsequently used in cluster analysis using k-means to identify different weather patterns for a weather station in San Diego, CA.
 
-The [next section](https://eagronin.github.io/weather-clustering-spark-prepare/) explores, cleans and scales the data to prepare it for clustering analysis in the subsequent section.
+The [next section](https://eagronin.github.io/weather-clustering-spark-prepare/) explores, cleans and scales the data to prepare them for clustering analysis in the subsequent section.
 
 The file **minute-weather.csv** was downloaded from the Coursera website and saved on the Cloudera cloud.
 
-This is a comma-separated file that contains weather data. The data comes from a weather station located in San Diego, CA. The weather station is equipped with sensors that capture weather-related measurements such as air temperature, air pressure, and relative humidity. Data was collected for a period of three years, from September 2011 to September 2014, to ensure that sufficient data for different seasons and weather conditions is captured.  Sensor measurements from the weather station were captured at one-minute intervals.
-
-Each row in **minute-weather.csv** captures weather data for a separate minute. This is the same dataset that was used to construct **daily_weather.csv** described [here](https://eagronin.github.io/weather-classification-spark-acquire/).
+This is a comma-separated file that contains weather data. The data comes from a weather station located in San Diego, CA. The weather station is equipped with sensors that capture weather-related measurements such as air temperature, air pressure, and relative humidity. Data was collected for a period of three years, from September 2011 to September 2014, to ensure that sufficient data for different seasons and weather conditions is captured.  Sensor measurements from the weather station were captured at one-minute intervals.  This is the same dataset that was used to construct **daily_weather.csv** described [here](https://eagronin.github.io/weather-classification-spark-acquire/).
 
 The following code imports **daily_weather.csv** from a folder on the cloud:
 
@@ -26,14 +24,20 @@ df = sqlContext.read.load('file:///home/cloudera/Downloads/big-data-4/minute_wea
                           header='true',inferSchema='true')
 ```                          
 
+Next step: [Data Preparation](https://eagronin.github.io/weather-clustering-spark-prepare/)
+
+
+
+
+
 # Data Preparation
-This section explores, cleans and scales the data to prepare it for cluster analysis, which identifies different weather patterns for a weather station in San Diego, CA using k-means. 
+This section explores, cleans and scales the data to prepare them for the cluster analysis that identifies different weather patterns for a weather station in San Diego, CA using k-means. 
 
 The dataset is described and imported in the [previous section](https://eagronin.github.io/weather-clustering-spark-acquire/).
 
 The analysis is described in the [next section](https://eagronin.github.io/weather-clustering-spark-analyze/).
 
-The imported dataset includes over 1.5 million rows, as can be verified using `df.count()`.  For the purpose of this analysis a smaller dataset was used that contains only one-tenth of the data.  The following code creates such a subset of data:
+The imported dataset includes over 1.5 million rows, as indicated by `df.count()`.  For the purpose of this analysis a smaller dataset was used that contains only one-tenth of the data.  The following code creates such a subset of data by keeping every 10th row in the subset and dropping all the other rows:
 
 ```python
 filteredDF = df.filter((df.rowID % 10) == 0)
@@ -57,64 +61,36 @@ avg_wind_direction	158680	162.15		95.27		0.0	359.0
 avg_wind_speed		158680	2.77		2.05		0.0	31.9
 max_wind_direction	158680	163.46		92.45		0.0	359.0
 max_wind_speed		158680	3.40		2.41		0.1	36.0
-min_wind_direction	158680	166.77		97.44		0.0	359.0
-min_wind_speed		158680	2.13		1.74		0.0	31.6
 rain_accumulation	158725	3.18E-4		0.01		0.0	3.12
 rain_duration		158725	0.40		8.66		0.0	2960.0
 relative_humidity	158726	47.60		26.21		0.9	93.0
 ```
 
-The weather measurements in this dataset were collected during a drought in San Diego. We can
-count the how many values of rain accumulation and duration are 0:
+The low average values for rain accumulation and duration in this dataset suggest that the data were collected during a dry period. The code below outputs the counts of days when the values of rain accumulation and duration are 0:
 
 ```python
 filteredDF.filter(filteredDF.rain_accumulation == 0.0).count()
-
-157812
-```
-
-```python
 filteredDF.filter(filteredDF.rain_duration == 0.0).count()
-
-157237
 ```
 
-Since most the values for these columns are 0, let's drop them from the DataFrame to speed up the analyses. We also drop the hpwren_timestamp column since it is not used in the analysis.
+For rain accumulation the count is 157,812 days, while for rain duration the count is 157,237 days, which are almost all the days in the sample.  Since the values for these features are almost all 0 (i.e., very limited variation in the data) and for the purpose of speeding up the analyses, these  features are dropped from the DataFrame. We also drop the hpwren_timestamp feature since it is not used in the analysis, as well as rowID since it is the row number:
 
 ```python
-workingDF = filteredDF.drop('rain_accumulation').drop('rain_duration').drop('hpwren_timestamp')
+workingDF = filteredDF.drop('rain_accumulation').drop('rain_duration').drop('hpwren_timestamp').drop('rowID')
 ```
 
-Let's drop rows with missing values and count how many rows were dropped:
+Next, we drop rows with missing values and count how many rows were dropped:
 
 ```python
 before = workingDF.count()
 workingDF = workingDF.na.drop()
 after = workingDF.count()
 before - after
-
-46
 ```
 
-Since the features are on different scales (e.g., air pressure values are in the 900's, while relative humidities range from 0 to 100), they need to be scaled. We will scale them so that each feature will have a value of 0 for the mean, and a value of 1 for the standard deviation.
+The code above indicate that 46 rows in the `workingDF` dataframe had missing values in at least one feature, before these rows were dropped.  
 
-First, we will combine the columns into a single vector column. Let's look at the columns in the
-DataFrame, using the command `workingDF.columns`:
-
-```
-['rowID',
- 'air_pressure',
- 'air_temp',
- 'avg_wind_direction',
- 'avg_wind_speed',
- 'max_wind_direction',
- 'max_wind_speed',
- 'min_wind_direction',
- 'min_wind_speed',
- 'relative_humidity']
-```
-
-We do not want to include rowID since it is the row number. The minimum wind measurements have a high correlation to the average wind measurements, so we will not include them either. Let's create an array of the columns we want to combine, and use VectorAssembler to create the vector column:
+Next, we combine the remaining features into a single vector column. Let's create an array of the columns we want to combine, and use VectorAssembler to create the vector column:
 
 ```python
  featuresUsed = ['air_pressure',
@@ -129,7 +105,7 @@ assembler = VectorAssembler(inputCols = featuresUsed, outputCol = 'features_unsc
 assembled = assembler.transform(workingDF)
 ```
 
-Next, let's use StandardScaler to scale the data:
+Finally, since the features are on different scales (e.g., air temperature ranges from 31.6 to 99.5, while air pressure ranges from 905.0 to 929.5), they need to be scaled. We will scale them using `StandardScaler()` so that each feature has the mean of 0 and the standard deviation of 1:
 
 ```
 scaler = StandardScaler(inputCol = 'features_unscaled', outputCol = 'features', withStd = True, withMean = True)
@@ -137,18 +113,20 @@ scalerModel = scaler.fit(assembled)
 scaledData = scalerModel.transform(assembled)
 ```
 
-The **withMean** argument specifies to center the data with the mean before scaling, and with Std specifies to scale the data to the unit standard deviation.
+Next step: [Analysis](https://eagronin.github.io/weather-clustering-spark-analyze/)
+
+
+
 
 
 # Analysis
-This section identifies different weather patterns for a weather station in San Diego, CA using k-means clustering. First, we determine the optimal number of clusters using elbow plot.  Then we find cluster centers for the optimal number of clusters to identify distinct weather patterns corresponding to each cluster.
+This section identifies distinct weather patterns using k-means clustering of the data collected from a weather station in San Diego, CA . First, we determine the optimal number of clusters using an elbow plot.  Then we find cluster centers for the optimal number of clusters to identify weather patterns corresponding to each cluster.
 
 The [previous section](https://eagronin.github.io/weather-clustering-spark-prepare/) explores, cleans and scales the data to prepare it for the clustering analysis.
 
 The [next section](https://eagronin.github.io/weather-clustering-spark-report/) reports and interprets the results.
 
-# Create Elbow Plot
-The k-means algorithm requires that the value of k, the number of clusters, to be specified. To determine a good value for k, we will use the “elbow” method. This method involves applying k-means, using different values for k, and calculating the within-cluster sum-of-squared error (WSSE). Since this means applying k-means multiple times, this process can be very compute-intensive. To speed up the process, we will use only a subset of the dataset. We will take every third sample from the dataset to create this subset:
+The k-means algorithm requires that the number of clusters (k) has to be specified. To determine a good value for k, we will use the “elbow” method. This method applies k-means using different values for k and calculating the within-cluster sum-of-squared error (WSSE).  This process can be compute-intensive, because k-means is applied multiple times. Therefore, for creating the elbow plot we use only a subset of the dataset. Specifically, we keep every third row from the dataset and drop all the other rows:
 
 ```python
 from itertools import cycle, islice
@@ -166,7 +144,11 @@ elbowset = scaledData.filter((scaledData.rowID % 3) == 0).select('features')
 elbowset.persist()
 ```
 
-The persist() method in the last row is used to keep the resulting dataset in memory for faster processing.  WSSE is calculated using the following function: 
+The persist() method in the last row is used to keep the resulting dataset in memory for faster processing.  
+
+Next, we define several functions that we will need for creating the elbow plot and parallel coordinate plots of cluster centroids.
+
+WSSE discussed above is calculated using the following function: 
 
 ```python
 def computeCost(featuresAndPrediction, model):
@@ -208,7 +190,7 @@ def elbow_plot(wsseList, clusters):
 	wsseDF.plot(y='WSSE', x='k', figsize=(15,10), grid=True, marker='o')
 ```
 
-The following function converts cluster centers determined by the the k-means algorithm to a pandas dataframe in order to be able to plot cluster centers in matplotlib (Spark dataframes cannot be plotted using matplotlib): 
+The following function converts cluster centers determined by the the k-means algorithm to a pandas dataframe in order to plot cluster centers in matplotlib (Spark dataframes cannot be plotted using matplotlib): 
 
 ```python
 def pd_centers(featuresUsed, centers):
@@ -224,17 +206,16 @@ def pd_centers(featuresUsed, centers):
 	return P
 ```
 
-Finally, the function below plots the cluster centers:
+Finally, the function below plots cluster centers:
 
 ```python
 def parallel_plot(data, P):
 	my_colors = list(islice(cycle(['b', 'r', 'g', 'y', 'k']), None, len(P)))
 	plt.figure(figsize=(15,8)).gca().axes.set_ylim([-3,+3])
 	parallel_coordinates(data, 'prediction', color = my_colors, marker='o')
-```  
+```    
   
-  
-The code in the remainder of this section calls the functions above to create the elbow plot and fit k-means algorithm for the chosen number of clusters.  
+The code in the remainder of this section calls the functions above to create the elbow plot and fit the k-means algorithm for the chosen number of clusters.  
 
 The following code calculates WSSE for each number of clusters ranging from 2 to 30:
 
@@ -243,7 +224,7 @@ clusters = range(2, 31)
 wsseList = elbow(elbowset, clusters)
 ```
 
-This code generates the following output:
+This code generates the following output, which is going to be used as input into the function that create elbow plot:
 
 ```
 Training for cluster size 2 
@@ -339,14 +320,14 @@ The code above results in a dataset that contains in each row a point in the fea
  ...
 ```
 
-Once the model is created, we can determine the center measurement of each cluster:
+The fitted model is then used to determine the center measurement of each cluster:
 
 ```python
 centers = model.clusterCenters()
 centers
 ```
 
-These cluster centers are as follows:
+These cluster centers are shown below:
 
 ```
 [array([-0.13720796,  0.6061152 ,  0.22970948, -0.62174454,  0.40604553, -0.63465994, -0.42215364]),
@@ -363,7 +344,7 @@ These cluster centers are as follows:
  array([ 0.3051367 ,  0.67973831,  1.36434828, -0.63793718,  1.631528  , -0.58807924, -0.67531539])]
 ```
 
-It is difficult to compare the cluster centers by just looking at these numbers. So we will use plots in the next step to visualize them using parallel coordinates plots, which are used to visualize multi-dimensional data.  Each line plots the centroid of a cluster, and all of the features are plotted together. Because the feature values were scaled to have mean = 0 and standard deviation = 1, the values on the y-axis of these parallel coordinates plots show the number of standard deviations from the mean.
+It is difficult to compare the cluster centers by just looking at these numbers. Therefore, we will visualize these numbers using parallel coordinates plots, which are used to visualize multi-dimensional data.  Each line plots the centroid of a cluster, and all of the features are plotted together on the same chart. Because the feature values were scaled to have mean = 0 and standard deviation = 1, the values on the y-axis of these parallel coordinates plots show the number of standard deviations from the mean.
 
 The plots are created with matplotlib using a Pandas DataFrame.  Each row in the dataframe contains the cluster center coordinates and cluster label. We use the `pd_centers()` function described above to create the Pandas DataFrame:
  
@@ -372,6 +353,9 @@ P = pd_centers(featuresUsed, centers)
 ```
 
 Next step: [Results](https://eagronin.github.io/weather-clustering-spark-report/)
+
+
+
 
 
 # Results
@@ -383,7 +367,11 @@ Let's first plot the elbowplot by calling elbow_plot() function described in the
 
 ![](elbow plot)
 
-The values for the number of clusters (k) are plotted against WSSE values, and the elbow, or bend in the curve, provides an estimate for the optimal value for k.  In this plot, we see that the elbow in the curve is between 10 and 15, so let's choose k = 12. The subsequent plots of cluster centers are all based on the number of clusters k = 12.
+The values for the number of clusters (k) are plotted against WSSE values.  The chart shows that WSSE declines as the number of clusters increases.  This is intuitive, because allowing for a larger number of clusters facilitates shorter distances between each point in the feature space and cluster centers.  However, as the number of clusters increases, the curve gradually flattnes, as the contribution to the decline in WSSE by adding a cluster diminishes. The bend in the curve (or elbow) provides an estimate for the optimal value for k.  In this plot, we see that the elbow in the curve is between 10 and 15, so let's choose k = 12. The subsequent plots of cluster centers are all based on the number of clusters k = 12.
+
+
+
+
 
 Let's show clusters for "Dry Days", i.e., weather samples with low relative humidity:
 
@@ -403,7 +391,7 @@ parallel_plot(P[P['air_temp'] > 0.5], P)
 
 ![](chart 2)
 
-All clusters in this plot have ​air_temp > 0.5, but they differ in values for other features.  
+All clusters in this plot have air_temp > 0.5, but they differ in values for other features.  
 
 Let's show clusters for "Cool Days", i.e., weather samples with high relative humidity and low air temperature:
 
