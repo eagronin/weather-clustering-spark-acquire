@@ -6,6 +6,10 @@ This section describes and imports the **minute-weather.csv** dataset, which is 
 
 The [next section](https://eagronin.github.io/weather-clustering-spark-prepare/) explores, cleans and scales the data to prepare them for clustering analysis in the subsequent section.
 
+This project is based on assignments from Machine Learning With Big Data by University of California San Diego on Coursera
+
+The analysis for this project was performed in Spark.
+
 ## Data
 
 The file **minute-weather.csv** was downloaded from the Coursera website and saved on the Cloudera cloud.
